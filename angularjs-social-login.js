@@ -1,24 +1,26 @@
 "use strict";
 
+import angular from "angular";
+
 var socialLogin = angular.module('socialLogin', []);
 
-socialLogin.provider("social", function(){
+socialLogin.provider("social", function() {
 	var fbKey, fbApiV, googleKey, linkedInKey;
 	return {
 		setFbKey: function(obj){
 			fbKey = obj.appId;
 			fbApiV = obj.apiVersion;
 			var d = document, fbJs, id = 'facebook-jssdk', ref = d.getElementsByTagName('script')[0];
-			fbJs = d.createElement('script'); 
-			fbJs.id = id; 
+			fbJs = d.createElement('script');
+			fbJs.id = id;
 			fbJs.async = true;
 			fbJs.src = "//connect.facebook.net/en_US/sdk.js";
 
 			fbJs.onload = function() {
-				FB.init({ 
+				FB.init({
 					appId: fbKey,
-					status: true, 
-					cookie: true, 
+					status: true,
+					cookie: true,
 					xfbml: true,
 					version: fbApiV
 				});
@@ -54,8 +56,8 @@ socialLogin.provider("social", function(){
 			lIN.text = ("api_key: " + linkedInKey).replace("\"", "");
 	        ref.parentNode.insertBefore(lIN, ref);
 	    },
-		$get: function(){
-			return{
+		$get: function() {
+			return {
 				fbKey: fbKey,
 				googleKey: googleKey,
 				linkedInKey: linkedInKey,
@@ -113,11 +115,18 @@ socialLogin.directive("linkedIn", ['$rootScope', 'social', 'socialLoginService',
 		restrict: 'EA',
 		scope: {},
 		link: function(scope, ele, attr){
-		    ele.on("click", function(){
+				ele.on("click", function(){
 		  		IN.User.authorize(function(){
 					IN.API.Raw("/people/~:(id,first-name,last-name,email-address,picture-url)").result(function(res){
 						socialLoginService.setProvider("linkedIn");
-						var userDetails = {name: res.firstName + " " + res.lastName, email: res.emailAddress, uid: res.id, provider: "linkedIN", imageUrl: res.pictureUrl};
+						var userDetails = {
+							token : IN.ENV.auth.oauth_token,
+							name: res.firstName + " " + res.lastName,
+							email: res.emailAddress,
+							uid: res.id,
+							provider: "linkedIN",
+							imageUrl: res.pictureUrl
+						};
 						$rootScope.$broadcast('event:social-sign-in-success', userDetails);
 				    });
 				});
@@ -141,11 +150,11 @@ socialLogin.directive("gLogin", ['$rootScope', 'social', 'socialLoginService',
 					var accessToken = currentUser.getAuthResponse().access_token;
 					return {
 						token: accessToken,
-						idToken: idToken, 
-						name: profile.getName(), 
-						email: profile.getEmail(), 
-						uid: profile.getId(), 
-						provider: "google", 
+						idToken: idToken,
+						name: profile.getName(),
+						email: profile.getEmail(),
+						uid: profile.getId(),
+						provider: "google",
 						imageUrl: profile.getImageUrl()
 					}
 				}
@@ -162,14 +171,14 @@ socialLogin.directive("gLogin", ['$rootScope', 'social', 'socialLoginService',
 					socialLoginService.setProvider("google");
 					$rootScope.$broadcast('event:social-sign-in-success', fetchUserDetails());
 				}
-	        	
+
 	        });
 		}
 	}
 }]);
 
-socialLogin.directive("fbLogin", ['$rootScope', 'social', 'socialLoginService', '$q',
- function($rootScope, social, socialLoginService, $q){
+socialLogin.directive("fbLogin", ['$rootScope', 'social', 'socialLoginService', '$q', '$log',
+ function($rootScope, social, socialLoginService, $q, $log){
 	return {
 		restrict: 'EA',
 		scope: {},
@@ -177,22 +186,23 @@ socialLogin.directive("fbLogin", ['$rootScope', 'social', 'socialLoginService', 
 		link: function(scope, ele, attr){
 			ele.on('click', function(){
 				var fetchUserDetails = function(){
-					var deferred = $q.defer();
-					FB.api('/me?fields=name,email,picture', function(res){
-						if(!res || res.error){
-							deferred.reject('Error occured while fetching user details.');
-						}else{
-							deferred.resolve({
-								name: res.name, 
-								email: res.email, 
-								uid: res.id, 
-								provider: "facebook", 
-								imageUrl: res.picture.data.url
-							});
-						}
-					});
-					return deferred.promise;
-				}
+				var deferred = $q.defer();
+				FB.api('/me?fields=name,email,picture', function(res){
+					$log.log(res);
+					if(!res || res.error){
+						deferred.reject('Error occured while fetching user details.');
+					} else {
+						deferred.resolve({
+							name: res.name,
+							email: res.email,
+							uid: res.id,
+							provider: "facebook",
+							imageUrl: res.picture.data.url
+						});
+					}
+				});
+				return deferred.promise;
+			}
 				FB.getLoginStatus(function(response) {
 					if(response.status === "connected"){
 						fetchUserDetails().then(function(userDetails){
@@ -200,7 +210,8 @@ socialLogin.directive("fbLogin", ['$rootScope', 'social', 'socialLoginService', 
 							socialLoginService.setProvider("facebook");
 							$rootScope.$broadcast('event:social-sign-in-success', userDetails);
 						});
-					}else{
+					} else {
+						$log.log(response);
 						FB.login(function(response) {
 							if(response.status === "connected"){
 								fetchUserDetails().then(function(userDetails){
@@ -216,3 +227,4 @@ socialLogin.directive("fbLogin", ['$rootScope', 'social', 'socialLoginService', 
 		}
 	}
 }]);
+export default socialLogin.name;
